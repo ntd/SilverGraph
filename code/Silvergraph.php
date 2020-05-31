@@ -6,6 +6,7 @@ use SilverStripe\Core\Environment;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DataObjectSchema;
+use SilverStripe\ORM\FieldType\DBField;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Control\CliController;
 use SilverStripe\View\ArrayData;
@@ -254,9 +255,20 @@ class Silvergraph extends CliController {
             $field = new ArrayData();
             $field->FieldName = $fieldName;
 
-            //special case - Enums are too long - put new lines on commas
             if (strpos($dataType, "Enum") === 0) {
-                $dataType = str_replace(",", ",\n", $dataType);
+                $dbObj  = DBField::create_field($dataType, null);
+                $values = $dbObj->enumValues();
+                if (is_array($values) && count($values) > 3 && strlen($dataType) > 32) {
+                    // Long enum: keep only the first and last value
+                    $dataType = 'Enum([' . reset($values) . ',...,' . end($values) . ']';
+                    $default  = $dbObj->getDefaultValue();
+                    // The implicit default value is $values[0]. If not,
+                    // it must be be explicitely exposed in $dataType.
+                    if ($default != reset($values)) {
+                        $dataType .= ', ' . $default;
+                    }
+                    $dataType .= ')';
+                }
             }
 
             $field->DataType = $dataType;
